@@ -1,7 +1,7 @@
-// import archiver = require("archiver");
+import archiver = require("archiver");
 // import admin = require("firebase-admin");
 import * as functions from "firebase-functions";
-// import * as admin from "firebase-admin";
+import * as admin from "firebase-admin";
 // import { initializeApp } from "firebase-admin/app";
 // import { getStorage } from "firebase-admin/storage";
 // import * as unzipper from "unzipper";
@@ -9,6 +9,11 @@ import * as functions from "firebase-functions";
 import * as JSZip from "jszip";
 import { saveAs } from "file-saver";
 var XMLHttpRequest = require('xhr2');
+import { initializeApp } from "firebase/app";
+import { getStorage, getStream, ref } from "firebase/storage";
+// var fs = require('fs');
+// const gzip = require('zlib').createGzip();
+
 // import fetch from "cross-fetch";
 
 // import { connectAuthEmulator, getAuth } from "firebase/auth";
@@ -30,7 +35,14 @@ var XMLHttpRequest = require('xhr2');
 //   measurementId: process.env.REACT_APP_FIREBASE_MEASUREMENT_ID,
 // };
 
-// const app = initializeApp(firebaseConfig);
+var serviceAccount = require("../../starbucks-119c1-firebase-adminsdk-b780s-406a672a16.json");
+
+admin.initializeApp({
+  credential: admin.credential.cert(serviceAccount)
+});
+
+const app = initializeApp(firebaseConfig);
+const storage = getStorage(app);
 
 export const helloWorld = functions.https.onRequest((request, response) => {
   functions.logger.info("Hello logs!", { structuredData: true });
@@ -150,3 +162,102 @@ const saveZip = (filename: string | undefined, urls: any[]) => {
 
   return blob;
 };
+
+export const downloadFile = functions.https.onRequest(async (_req, res):Promise<void | Promise<void> | any> => {
+  // const bucket = admin.storage().bucket('images');   
+  // console.log(https://firebasestorage.googleapis.com/v0/b/starbucks-119c1.appspot.com/o/images%2F6b3ec2ed-3f9b-4969-8fdc-d1d12cdf4632.jpeg)                // initialize storage as admin
+  // const stream = bucket.file("6b3ec2ed-3f9b-4969-8fdc-d1d12cdf4632.jpeg").createReadStream();    // create stream of the file in bucket
+  
+  // const zip = new JSZip();
+  // const folder = zip.folder("files");
+
+    //   const urls2 = [
+    //   "https://firebasestorage.googleapis.com/v0/b/starbucks-119c1.appspot.com/o/images%2F6b3ec2ed-3f9b-4969-8fdc-d1d12cdf4632.jpeg",
+    //   "https://firebasestorage.googleapis.com/v0/b/starbucks-119c1.appspot.com/o/images%2Ff4a14abf-9a81-41dc-8d96-158d36cf0880.jpeg",
+    //   "https://firebasestorage.googleapis.com/v0/b/starbucks-119c1.appspot.com/o/images%2Fcd668304-521a-4008-adcf-2239148b3bed.jpeg",
+    // ];
+
+
+// const listStream =urls2.map(async item => {
+//   const httpsReference = ref(storage, item);
+//   const stream2 = getStream(httpsReference)
+  
+//   // pipe stream on 'end' event to the response
+//   // return stream2
+//   //   .on('end', (data: any) => {})
+//   //   .pipe(res);
+
+//   return stream2.pipe(res).on('end', (data: any) => {
+//     console.log(data)
+//     folder?.file("nome_da_img.jpeg", data);
+//   });
+// })
+
+const httpsReference = ref(storage, "https://firebasestorage.googleapis.com/v0/b/starbucks-119c1.appspot.com/o/images%2F6b3ec2ed-3f9b-4969-8fdc-d1d12cdf4632.jpeg");
+const stream2 = getStream(httpsReference)
+
+const file = stream2.pipe(res).on('end', (data: any) => {})
+
+const storageAdmin = admin.storage();
+const bucket = storageAdmin.bucket('zips');
+
+// // generate random name for a file
+// const filePath = uuidv4();
+const fileCriador = bucket.file("teste.zip");
+
+// const storageRef = ref(storage, "zips/teste1.zip");
+// const uploadTask = uploadBytesResumable(storageRef, file, metadata);
+
+const outputStreamBuffer = fileCriador.createWriteStream({
+  gzip: true,
+  contentType: 'application/zip',
+});
+
+const archive = archiver('zip', {
+  gzip: true,
+  zlib: { level: 9 },
+});
+
+archive.on('error', (err) => {
+  throw err;
+});
+
+archive.pipe(outputStreamBuffer);
+
+const filePath = "images/6b3ec2ed-3f9b-4969-8fdc-d1d12cdf4632.jpeg"
+
+const userFile = await bucket.file(filePath).download();
+
+archive.append(userFile[0], {
+  name: "filne_name", // if you want to have directory structure inside zip file, add prefix to name -> /folder/ + userFileName
+});
+
+archive.on('finish', async () => {
+  console.log('uploaded zip', filePath);
+
+  // get url to download zip file
+  await bucket
+    .file(filePath)
+    .getSignedUrl({ expires: '03-09-2491', action: 'read' })
+    .then((signedUrls) => console.log(signedUrls[0]));
+});
+
+await archive.finalize();
+
+
+//   const blob = zip
+//   .generateNodeStream({ type:'nodebuffer', streamFiles: true })
+//   .pipe(fs.createWriteStream('out.zip'))
+//   .on('end', (res: any) => {
+//     console.log(res)
+//     // saveAs(res, "nome_do_zip.zip")
+//     console.log("out.zip written.");
+//     // return res
+
+//   })
+//   // .then((blob) => saveAs(blob, "nome_do_zip.zip"));
+
+// return saveAs(blob, "nome_do_zip.zip")
+
+    
+});
