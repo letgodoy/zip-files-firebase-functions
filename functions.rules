@@ -1,9 +1,0 @@
-{
-  "rules": {
-    "<<path>>": {
-    // Allow the request if the condition for each method is true.
-      ".read": <<condition>>,
-      ".write": <<condition>>
-    }
-  }
-}
